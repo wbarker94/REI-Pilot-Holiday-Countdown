@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>REI Co-op · Holiday Countdown</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bitter:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#000000;
+    --card:#FFFFFF;
+    --ink:#111111;
+    --ink-muted:#555555;
+    --muted:#C9CFCB;
+    --red:#D2232A;      /* holiday red */
+    --pine:#2B5640;     /* ridge */
+    --ridge:#1A3529;    /* far ridge */
+    --gold:#F0B64A;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:transparent}
+  body{font-family:"Work Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#fff}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+  /* 856 x 559 (about 3:2) at every width, 220px to 900px */
+  .widget{
+    container-type:inline-size;position:relative;isolation:isolate;
+    width:100%;min-width:220px;max-width:900px;margin:0 auto;
+    aspect-ratio:856 / 559;overflow:hidden;
+    display:flex;flex-direction:column;
+    background:var(--bg);border-radius:clamp(10px,1.6cqi,14px);
+  }
+  canvas.snow{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+  .inner{position:relative;z-index:2;flex:1;display:flex;flex-direction:column;padding:3cqi 3.4cqi 0}
+
+  /* Header */
+  .top{display:flex;align-items:center;gap:2.2cqi}
+  .badge{background:#fff;border-radius:clamp(4px,.9cqi,8px);padding:clamp(3px,.8cqi,7px) clamp(4px,1.1cqi,9px);line-height:0;flex:0 0 auto}
+  .logo{height:clamp(18px,5.2cqi,44px);width:auto;display:block}
+  h1{flex:1;min-width:0;font-family:"Bitter",Georgia,serif;font-weight:800;font-size:clamp(14px,4.4cqi,38px);line-height:1.05}
+  .snowbtn{flex:0 0 auto;display:inline-flex;align-items:center;gap:.4em;font-size:clamp(10px,1.6cqi,14px);font-weight:600;
+           border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:.35em .8em;color:#fff}
+  .snowbtn[aria-pressed="true"]{background:#fff;color:#000;border-color:#fff}
+  .snowbtn:focus-visible,.tab:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+
+  /* Holiday tabs */
+  .tabs{display:flex;gap:1.2cqi;margin-top:2.2cqi;flex-wrap:nowrap}
+  .tab{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+       font-weight:600;font-size:clamp(10px,1.8cqi,15px);padding:.5em .6em;border-radius:999px;
+       border:1px solid rgba(255,255,255,.35);color:#fff;transition:background .2s,color .2s}
+  .tab[aria-selected="true"]{background:var(--red);border-color:var(--red)}
+  .tab .short{display:none}
+
+  /* Countdown */
+  .clock{display:grid;grid-template-columns:repeat(4,1fr);gap:1.4cqi;margin-block:auto}
+  .unit{background:var(--card);border-radius:clamp(6px,1.1cqi,10px);padding:1.3cqi 2px 1cqi;text-align:center}
+  .num{font-family:"Bitter",Georgia,serif;font-weight:700;color:var(--ink);line-height:1;
+       font-size:clamp(18px,6.6cqi,58px);font-variant-numeric:tabular-nums}
+  .unit.days .num{color:var(--red)}
+  .lbl{font-size:clamp(9px,1.5cqi,13px);color:var(--ink-muted);margin-top:.3em}
+
+  .merry{display:none;margin-block:auto;text-align:center}
+  .merry .big{font-family:"Bitter",Georgia,serif;font-weight:800;color:var(--gold);font-size:clamp(20px,7cqi,60px);line-height:1.05}
+  .merry p{color:var(--muted);font-size:clamp(10px,1.8cqi,15px);margin-top:.4em}
+  .widget.is-today .clock{display:none}
+  .widget.is-today .merry{display:block}
+
+  /* Ridgeline: the marker climbs toward the selected holiday */
+  .trail{position:relative;z-index:1;flex:0 0 auto;line-height:0}
+  .trail svg{display:block;width:100%;height:auto}
+  .hiker{transition:transform .8s ease}
+  .caption{position:absolute;left:3.4cqi;right:3.4cqi;bottom:1.6cqi;line-height:1.2;
+           display:flex;justify-content:space-between;gap:8px;font-size:clamp(9px,1.5cqi,13px);color:#E6EEE9}
+  .caption strong{color:var(--gold);font-weight:600}
+
+  @container (max-width:560px){
+    .snowbtn .txt{display:none}
+    .caption .msg{display:none}
+    .caption{justify-content:flex-end}
+  }
+  @container (max-width:360px){
+    .tab .long{display:none} .tab .short{display:inline}
+    .caption{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){ .hiker,.tab{transition:none} }
+</style>
+</head>
+<body>
+<section class="widget" id="hol" aria-labelledby="hol-title">
+  <canvas class="snow" aria-hidden="true"></canvas>
+  <div class="inner">
+    <div class="top">
+      <span class="badge"><img class="logo" alt="REI Co-op" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIQAAABUCAYAAABDep+IAAAAAXNSR0IArs4c6QAAAIRlWElmTU0AKgAAAAgABQESAAMAAAABAAEAAAEaAAUAAAABAAAASgEbAAUAAAABAAAAUgEoAAMAAAABAAIAAIdpAAQAAAABAAAAWgAAAAAAAACQAAAAAQAAAJAAAAABAAOgAQADAAAAAQABAACgAgAEAAAAAQAAAISgAwAEAAAAAQAAAFQAAAAAVcsbtAAAAAlwSFlzAAAWJQAAFiUBSVIk8AAAFxxJREFUeAHtnQWwJDUTgHOCO4fr4Vq4uxXuLgUcFO7ucrgdULi7u7vcIYW7FM473N01f3/h7yEzO5KZnd1973hdtTWzM0nHOm3pZPpYAdMLhT3w6quvmssuu8ysuOKKZpFFFjEjjzxyYZ4emQCC6IX8Hnj++eftMsssY4UI7Mwzz2xvvfVW+9tvv+Vn6qFvTQ+td9uqLZzBLrXUUo4YZMbDTe0ss8xir7rqKvvTTz+1rR7tKqiXIHJ6+o033rCLL754jBiUKCaeeGJ75pln2u+//z4HQ8971UsQGWP22muv2QUXXNCONNJIjisoIfjXccYZxx588MH2k08+ycDS8x73EkTKmL377rt2vvnmayCGvn372jHGGCP2fNRRR7U77LCDfeedd1Iw9bxHvQSRGDPERBoxwBlQLG+88Ua7zTbb2HHHHTfiHP3797frr7++Rfns6dBLEN4Ifvjhh3bWWWe1/fr1iwZbRcQUU0xh77jjDvv777/b7777zu611152wIABUTq4x7LLLmsfeOABD2Nrb//+++/aC6iVIP7880/79ddf288++6z2irYa4fvvv2/nmGMOy8AqEegVsXDaaae5tmk9fvjhB3vMMcdYCEXTcZ1//vntTTfdZP/66y9N2pLrl19+aV944YXa+7pWgkD2Hn300fb4449vSSe0CimcYeDAgbGB1UHu06eP0xGGDx/eUPwff/xhzz//fOeb8NNPP/309tRTT7W8r3sWg+/jjz+2W2yxheNQu+++u+3q6mqoW9UHtREEFb322mvtVFNNZZdffnn71ltvVa1T2/JR57ffftuJCR3Q5FW8km4mZs14uOJ1111n55577hhBwTmOOuooJ17qbNAzzzxjV1ttNTv66KO78nCWDRo0yOIvqQNqIwi07G233dZVctJJJ7VHHHFEHfVrGQ4GmJk100wzxQbSJ4jxxhvP3n///YVeSQjrnnvusUsuuaSFoyiO8ccf3+64444xUVO1QRAedVlggQUadBzKXHPNNe2TTz7ZNEeqjSDEz28nm2yyqDMWW2wx+9JLL1Vtf0vzwcqZUbPNNltUXx1EvdLJOJ6+/fbb4Lo8/fTTdq211ooRxZhjjmk32mgjx4mCESUSQgxnn322nW666WK4ta56XXTRRe1dd92VyF3uby0Egam2+eabxzp3wgkntPvtt5+lMd0JqM8rr7xiZ5999lh9tVP1utlmm1VyOL388suuLzBFFdcoo4xil1tuOUeEcJMy8PPPP9sDDjjATjLJJDFigNDgbvSzlsMV0XXllVc6/aVMOZq2aYKggeedd56rsF8xZhiePmRedwFMRuqTlPd+vbVTIfKqxIwCuueee9rRRhstGixk/UILLeRES2h/fPTRR3bTTTe1Y401VoSH+oHroIMOcnoafc+Cm9+Gaaed1im1v/76a2hRUbqmCQIX78YbbxyrkFYOGbzrrrtW7tioljXcICYghnnmmSe1rlpnlLWHH37Y+RuaKfbTTz+1Rx55ZGwwmSRYIDfffHNhn2CxIQIYfK0bVzgPfdrlWRY4y5h8vsmMHjd48GD7448/lmpG0wRxxhln2IkmmihWaW0AHcBsfOyxx0pVqu7EEMMTTzzhfARat6zrySefbGHTdQA+mWT/MGhYIJilWYDyyIqqL3a0vltuuaWFe/kAl6aPV1555dg4oNRCPF988YWfPPe+KYLAMbLGGmvEKqEV1yvsDrOIQekEUO6jjz5q55133tx6Ut/11luvNmLQtrJEfv311ztzXPuEKwtjBx54YMyCwfJBOafPmEx+eghp7bXXzjUv33zzTbv11ltbHGmaF46HWx3HW4j+UpkgQD5kyJCY+1Yr4V9pGO7gdrp0dTDQAR555BFnqvl1SrufeuqpnRIZ0mmKP/T6yy+/2DvvvNN5Qv2yGSyUcQ22wR3u6x1+2hVWWME+++yzhaIGvQNCG3vssSOigEDgHs8991xhlSsTBMhXWWWVqFC/8sl7KB49o51cgrKGDRvm5HCyPsn/WAFDhw4NmkGFPZqRgPo8/vjjTmz5sx+xgKMJUZCsl/5H78GkDVVyMZVPP/30mKJPOTjZinwVlQiCWYTjCaVRK110nWaaadziUEZ/1foY1gtHChETsOJ2udohCszSVVddtaHffCLx+3LGGWd0Ik+5SGhHoQfhOfbNa4iC9ZobbrghE00lgoDKsKv9ihfdw7bgKJh+rQQ6/b777nOzoahOrGrCitsJECvyfIMNNmjQE5L1xdH34IMP2irmI22Co8D54AxKcFwRj5dffnkqxylNEDQIGYVSlGxA0X9MoWuuuaal/X/33XcXmpbUE86ACdiJlVk4LGbpvvvum9mHiFnaUpUYtJMhCjzGONqUKGg7IYCHHnqoJouupQkC8waffdHgp71HVhNk0gouQcNx2zIb0sr2n9ExePhuv/32qCM6cYMFcsghh1j6xa8fiiXexrrMX9rWJX6LnXbayUV8aVkQ3T777BMLFi5FEFA2CHwNVpGHXieYYAJ7xRVX1N7/BK+w8BNSD+oPl+sOgAVy0UUXxep9zjnn1EoMtJOx+/zzzy1+FrVkmBjcr7vuupHCX4ogHnrooaAZmDcoKDZozXVRPyKMfRKhxEAHrL766pGp1x2IgjoQVIMYJugGPahVQJQ43GfKKad0IgSiQIQsvfTSTowFEwSVhOWwqJI34CHvwHHWWWfV0mbcwEQphZRLw9G6u2usBvUqa01U6UTKwImFiNUf+srrr79ugwni3nvvDTLjQgeGBZlmNrrAAm+55ZZgzsBMQLu++uqrq/RhW/LQpnYBZaX9gggCJXCrrbaKKSQhA5+XhkWbk046qXL7YbGhnIF6oLug/yBieiG7B4IIAnYy55xzBrHlPCLw3zFjWeQhWLUsICaKVi39stAbCFz56quvyhb1n0tfSBBowazJawyf39HN3kMUabZw1ijA4vC+sYJK3pDy0RtYGmYhrgyksdOiZ1n4i/LV9T6r/DLP+0un5oIsnRoZACN2u5FBMGJpGHF0GBEjufmyXgphGVloMSLPIUYjVkdW0obnsu5vJHDVlU/eEKA8sbeNuLKNLCsb4RZGAlWMcJjM7KJAG/EQGlkoMiJiMtP5L8RCcDjF2RU9lv0bRgjRyHK167voRc039KGITyMKc4RZ9DMj601GvMrBZYvnVoRrAUC9OH34EaEcuqAlNUudwWyFIxgXwHIJMbGQ++gMiK1QzqDlkx4ugZuaH04gIpfSysUUxi2P4w2nDWnRdYp+7P/EemFHuA+6HM17cLXqxy4y9o34gCd0//33d2OAqa/t1yvPkj+kQOH0hCsIEkd5zFAovhmQTje33XabEbetkQWvIFQST2AOO+wwI9FZjqsEZfp/IumkWB4hcAPXE9Mr4k6kEV+GkUBWxxmqcD+ZMLFyKB68PIfjtBLgEGmcjPIB6hAC4OkbkpA0XV1dERsNzZOWjkp+8803Rig67XXsGYMnnKEyMcSQeX8gcgC2Kq54IzqGkSASI6H0lUWhh75H3wYTBLOUY3XqAGan+AOMLCzlopMNMEZczEYcJg2zLzdjwUtRlA3tWWeddYysrRiJNXCEoDOqIPsI/TqIID744AMjS8pGtrzV0hnMfNmbmMklGBhxOkXEQPq6ANyyFc6IX8WIs82Jjrpwjwh4gghCTL3aZyly7dxzzzXiW2/oR8TEHnvs4cRUK2YtONNkfkNFesgDJkxd/VSoVMIdJB7QmWB19g8NgEuccsopRk5hiVDLqqWRNRMjWnJtjYyQB9ygX4jWbiRewBEk4q2dIFvyjDjRjFhGUbGq8/AgbeBRBueaa64ofTM3hQQBdxDzydTJtrXCNA7lUnYwG1nwMuKBdMSAbpHWcM3Xqisdv8kmmxjZj2lks42RzTZOvLSqvDS8EpBsNtxwQyOmatrrzGc+0WQmCniRSxDMUriDnKEUgKpaEkzACy+80Mg+SyNb3A3OnHYSAx0pvhEjPg5z7LHHOqcVM65I4a3W2vBcdQ1weIn/pMwlCFk3d9whzcYtW1Beetnh5OzoKsQggb6OvUqkcaotnlcus1BOfTESteS8jOI4ykv+n3iXSRASXeOcNXCJVgNcogowk/EfYEZyymwoMPASUONEgmw0chypUzMytM7tSpdJEHAHcVUHe7naVWG/HNnP4GS+xEYGixkGfvLJJzf4OFAcge5GDIjMsjobbaijHakEIXsSjcTud1yO+oOfvEf5kl1PjtXjCi8DaPAseHVHkKh0I5uSY1ZGXj0hHjge+hcWSrOQShDdnTtIkKzZfvvtjRxdVHomNdthrc4vJ/EY2fldqhhWdPG41gENBIFyhjyWYJIYC2qn5p/XMBba5JxINxtYymY9oipktakO1lu1TuTLqlczOEPzNhDE0KFDDRQn29EjHJidLEiFrppFGVtwQywFdrpEW1XGzmqmbKlzrDbZ+SqLWczrDu2t3MiKGRsIAi8ZPwU4xqBBg4xE5+qjjl3lCB0nKprxykEAspXO+RvqbIgc+WP49XT41z+a0RLWFeRMpo4vC8O19t57byOn00fxGRlVbvtj2VRs5GAOI4E1bS+77gIbOIRfgATAulXHulY5fdxl7rEKUCJlY65zcZfJ2+q0hBfKeU8Gf0YdugfOsrJua9lIHQX7NNveXILAnCMGot0LPMlGrbTSSs7ExH/QnQDOMHjwYBcjWgcx0LbtttvOcRucbj4k8fu6D+9YkKsD4qV6GNHeWdjqNHeQsxnNbrvtZmRjTy0z0GtiU7cQA2F9cC1/ZbIppJIZ/4hss+vYN70ydQgCYuAOsh292TZWzg8rlEBR52Yuy0YrFxqQEdOXVVF0huRMDsjerZOkEgRm2aWXXlp7DETZniAuAnGBI6o7AYt9+GqIxxzRIFVkyNlMLrqaRaNOwRJLLOEcUHLISK1VQN5iHsq2+Eh5I1Bn5513LmVJycdSnEglcnyGGWaotY6dRNZAECgrcjpqR9cxUB7ZkMNmnqQyldVZpPMVrax0PCf+gYUxTFkFVnf9yC19nndlgYw4DtlnEsOVl6foHZOQ1d+kiNS2JfuD5zwjwMhvT1E5We8bCAI2+NRTTxn2T3QCkM/yzQ23W0w2yARXQTssOEMiIaYjwUDsdApdaSQe9JJLLjFylLAzOxMoK/2VYxKMHCAS5dV26VUJQq88x4UvWyKdhRJlrHjTQBByeolbx6iIr+ls+BvklDY3i5tGVhLBBRdc4BRFRIgOQBGKF1980S2lYwXhSW0WUOLLKvK42OtyDcSUSuQieyCbWTBqtkNYtauD9VWpB+s3+BVgv2WAWFBM9LIDWaaMdqWNEQQR0KxddBLkk0UGD2mngJVUltUxeUOBCUQcA9sBezpEBCHH2bgFrE5aFnQmm2fYLd3q/ZBZA4df4bjjjnN6ge5pzUrrP8dng5LJLjMFcPWkOE2U7YggTjzxRLdpJlR2aqPrviIPCdCpwqlQtEJ+RXXGO4rFoUcghOKUg1XMxRdf7GI8KQPzln2jiMAQHFXSFLWF9yF48bbusssuximVbG0jZK4uxSSkknlp2Hcpp7obOd6/cGWThgwcONDIJ51cw/Pw6js5IbbQ3SwnzRoURt33qXnzrlgnmIxySLmrD4SAgsxzOSqgJToGExguRJt8wGzFbF944YULvalwQlaRiT7vIwgtG2Xkuw4dY9N+Q/SedQL5hLKRs6H0UeqVDsGzWkbEMGNgj0WgeCkjFMCNuez7ESAIxRWKp0w6LdM306kzfcIk530e8D7iYhIJxRG/hsDaMg3PK6COd2j8aO44fooaVEd5vTj+6YF+sk4wGIdMdyIGqoYvgFgD5Hmoxh/SBtKk/dKILg9fGg5Nn4YrjeCycPjP0/Il8Wu5fj69T8vPs+R7xdmfvQnyJRmn2RPtK99oakichbTVzzlDAt0gZK0f04/TbeR7WW5RTjtJ65j8rx3AcxRZIp7gRgAsHo8l50wRT8r/IgAf6y7IYvmYfK5IAh+6BkqoekZDltARCZwjha9GPpgb6QZskOb8rBDx4LeDOiM60TMwtZ0YlQ5xh5HLjHSnm4qW7D7owXe0RA7GPuwlyBCmbftRPqfny2BTzUzgaEO+ecGB5tKxlerHia4yUK4Mzs/k0wRlcZGefhMLJfPoZs7L4qwuWbxL/aZWUf/SJ5yRxTHTWl/Rt2IfeyvC4b8XonDnXfMNDwBukAp8NoAzpPlmJGdDy4pe7FtOPtJW3vMlnqKjiMUqiX0opEp9IAiArwzy6QA6qgoe8vABNb6dlQYcBiaxoZVxa534tpb2SzMEofi48mG4hrUMeeFAKN2tCMqpc05DZiGHTSScwwSLwpHFAhjsVhqu2Wq/Eu0t52Q6E8rX3LUgtHeOSVSHEM4gdI4ipxLsUgEcGuiCGxpPKW0CB9p3Gjv384OHGAlc12j2w+UoAUQBQTSk4x1igvrjX0FUKFAuUVJZfeg/BzdlgItFSMrxj0EEJ/gQLdp+P7+WqVfegY/6UU+OZsgkCM1EZ9DB/CAS5A0rg+xboNHy+UN3HiIDwt6NugGcECHyndCyJECUdDKECaCIyheFnSzP6wwfD+nYRQ6wQUnzsSEYdz72fB7QR6wDnXDCCe7oJQaOekFo6GR4XzlegFBAOp9d7gAEgo4EEYasg3DMEl5UJiZEm5YHfDiY0DUgnCyAALAs5bhnIx+qc23mcJhCgkhDCBUSFAJ14sChYgwcnYI/n8NNUcbomDo4CMG+8olCtzknOTNptBIDdaWTGVy8jM0C3GHAgAFuIhThwomWtIaoG84tlqapk3yCIOafoC0sXRMRFhIVxuGoysmy6oNiiMIZErSDYpsstxJBaGVoEAPAD7ZHRQhHZwZwpiSbVvnhuUPEVPWEYv1AZCwvw6V6CsAhmBhsDAJYo/FPm+2O7WiKILIaBCVzfDB+fLgEC2bvvfeeC0CB7XHMAGYiBJLH1hQ/LBwuIR9+CyIIZfl6VTx51yTnIW2Z/Gm44RjsMmMnHP3ANkQljrT0dT1La0sW7mTalhCEFk5hKDj85POA7ofMQp6iCHIWs3zL0v1wROUBaflxDIDP5pDfqkCRH8Ij0AWOEkJs5EHkEFPJeoDPklHawIX7XIkj2YE85xnlwgUB/lMn6gbr5oQc9BziLHinZaBPoIuhzEEwPmg5Wi7v2I+qepri9/NwDz75hJXzx/h59V7xkpZJSXoFtzIrCTsG0iHuq3P4EfjOJmdg8xVgkbfufGmpfMw845xtIYpYfcEhIXex0/rJJ4MR/JMOcR+KBzF+DyE4Vy54pOMbzoSWAW14RjqtL9/mwBRMAxF/ViLJo3ZRzzR8ac9Iq2XwSSQ+DAv4ZmcZfJSh+LjKQa7Zfoi0xrTjGd+EYtBlCdx98ESsmujDLTLDrGwPaPh0ocSAxj6ETuPK/HyCEOvAyrlTjiB5XgaPpmXARZlM7S6cbBzkLspfRBSar+hKffiJsut8BsJ1XBk+QWiaIlz6XtvI974kpiPbDyEJOwIop5iOyF4sGFgpihkbhzDPUMxYrif8XYFPA2AKw5KHyRYCn/1Kj7lk0gGavOGK8gcLBtD6icdgTwi2PuYjEIIH0YglwaGriMg0wHLBTUxwLuYxZm4o0AasGVanOVsLXS0JMuudtYOi70NW/Wk35jzmNeLYLX/7GbvzPTKXAULW0flJwOaHWNTOT77P+k9n4edwvvz/J4JIUADBFaKLMFgMEOsZITGZ4EQfoAwIOI9gtd4MNnoOpjD3CocffrgZMmSI803QDo5tZk0lpN4ovvhZVC/7F6ti78ZXqBkOkgUMhHwrO+t1qecQXNILWApBQWKR9W5gGdw6AQ7HCjF7T6tAFEJXJXNvnhGvB3oJYgQZUxU5eq3arB4lMqo2ckTPhx5AzIiK1KRCWab9/wNu2RUYfKkQCgAAAABJRU5ErkJggg=="></span>
+      <h1 id="hol-title">Holiday countdown</h1>
+      <button class="snowbtn" id="snowbtn" aria-pressed="true" aria-label="Snowfall">❄<span class="txt"> Snow</span></button>
+    </div>
+
+    <div class="tabs" role="tablist" aria-label="Choose a holiday">
+      <button class="tab" role="tab" data-h="blackfriday"><span class="long">Black Friday</span><span class="short">Black Fri</span></button>
+      <button class="tab" role="tab" data-h="christmas"><span class="long">Christmas</span><span class="short">Xmas</span></button>
+      <button class="tab" role="tab" data-h="newyear"><span class="long">New Year’s</span><span class="short">New Year</span></button>
+    </div>
+
+    <div class="clock" role="timer" aria-live="off">
+      <div class="unit days"><div class="num" id="d">--</div><div class="lbl" id="dl">days</div></div>
+      <div class="unit"><div class="num" id="h">--</div><div class="lbl">hours</div></div>
+      <div class="unit"><div class="num" id="m">--</div><div class="lbl">min</div></div>
+      <div class="unit"><div class="num" id="s">--</div><div class="lbl">sec</div></div>
+    </div>
+
+    <div class="merry" role="status">
+      <div class="big" id="today-big">Happy holidays</div>
+      <p id="today-msg"></p>
+    </div>
+  </div>
+
+  <div class="trail" aria-hidden="true">
+    <svg viewBox="0 0 900 150" preserveAspectRatio="none">
+      <path fill="var(--ridge)" d="M0 95 L90 60 L150 82 L240 34 L320 74 L410 46 L500 80 L600 40 L690 70 L780 50 L900 78 L900 150 L0 150Z"/>
+      <path fill="var(--pine)" d="M0 132 L120 112 L210 120 L330 90 L420 101 L540 70 L620 80 L740 40 L800 50 L860 26 L900 38 L900 150 L0 150Z"/>
+      <path fill="#fff" opacity=".9" d="M845 33 L860 26 L878 34 L868 37 L860 32 L852 38Z"/>
+      <g fill="#0F2219">
+        <path d="M60 134 l10 -24 l10 24z"/><path d="M78 134 l8 -18 l8 18z"/>
+        <path d="M250 124 l11 -26 l11 26z"/><path d="M470 104 l10 -24 l10 24z"/><path d="M660 86 l9 -22 l9 22z"/>
+      </g>
+      <path id="path" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="2" stroke-dasharray="2 7"
+        d="M20 129 L120 112 L210 120 L330 90 L420 101 L540 70 L620 80 L740 40 L800 50 L860 26"/>
+      <path transform="translate(860 13)" fill="var(--gold)" d="M0 -11 L3.2 -3.4 L11 -3.4 L4.8 1.5 L7 9 L0 4.6 L-7 9 L-4.8 1.5 L-11 -3.4 L-3.2 -3.4Z"/>
+      <g class="hiker" id="hiker"><circle r="8" fill="var(--red)" stroke="#fff" stroke-width="3"/></g>
+    </svg>
+    <div class="caption"><span class="msg" id="msg"></span><span id="pct"></span></div>
+  </div>
+</section>
+
+<script>
+(function(){
+  const root = document.getElementById('hol');
+  const $ = id => document.getElementById(id);
+  const pad = n => String(n).padStart(2,'0');
+
+  // 4th Thursday of November (Black Friday is the day after)
+  function thanksgiving(y){ const d = new Date(y,10,1); const first = (11 - d.getDay()) % 7 + 1; return new Date(y,10,first + 21); }
+
+  const HOLIDAYS = {
+    blackfriday:  { name:'Black Friday', date: y => { const t = thanksgiving(y); return new Date(y, 10, t.getDate() + 1); },
+                    greet:'#OptOutside', msg:'Our doors are closed today. Enjoy your day outside.', note:'Black Friday means #OptOutside' },
+    christmas:    { name:'Christmas', date: y => new Date(y,11,25), greet:'Merry Christmas',
+                    msg:'Thanks for all you do this season.', note:'Season’s greetings from your co-op' },
+    newyear:      { name:'New Year’s', date: y => new Date(y+1,0,1), greet:'Happy New Year',
+                    msg:'Here’s to new trails ahead.', note:'New year, new trails' }
+  };
+
+  // Next occurrence of a holiday (stays on "today" for the whole day)
+  function next(h, now){
+    let y = now.getFullYear();
+    if (h === HOLIDAYS.newyear && now.getMonth() === 0 && now.getDate() === 1) y -= 1;
+    let t = h.date(y);
+    if (now >= new Date(t.getFullYear(), t.getMonth(), t.getDate() + 1)) t = h.date(y + 1);
+    return t;
+  }
+
+  let current = 'christmas';
+  try { const saved = localStorage.getItem('rei-holiday'); if (saved && HOLIDAYS[saved]) current = saved; } catch(e){}
+
+  const tabs = [...document.querySelectorAll('.tab')];
+  function select(key, focus){
+    current = key;
+    tabs.forEach(t => { const on = t.dataset.h === key; t.setAttribute('aria-selected', on); t.tabIndex = on ? 0 : -1; if (on && focus) t.focus(); });
+    try { localStorage.setItem('rei-holiday', key); } catch(e){}
+    tick();
+  }
+  tabs.forEach((t,i) => {
+    t.addEventListener('click', () => select(t.dataset.h));
+    t.addEventListener('keydown', e => {
+      if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft') return;
+      const j = (i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length;
+      select(tabs[j].dataset.h, true);
+    });
+  });
+
+  const path = $('path'), hiker = $('hiker'), len = path.getTotalLength();
+  function placeHiker(p){ const pt = path.getPointAtLength(len * p); hiker.setAttribute('transform','translate(' + pt.x + ' ' + (pt.y - 4) + ')'); }
+
+  function tick(){
+    const now = new Date(), h = HOLIDAYS[current], t = next(h, now);
+    const isToday = now >= t;
+    root.classList.toggle('is-today', isToday);
+    $('msg').textContent = h.note;
+
+    if (isToday){
+      $('today-big').textContent = h.greet; $('today-msg').textContent = h.msg;
+      placeHiker(1); $('pct').innerHTML = '<strong>Summit reached</strong>'; return;
+    }
+    let diff = t - now;
+    const d = Math.floor(diff / 864e5); diff -= d * 864e5;
+    const hh = Math.floor(diff / 36e5); diff -= hh * 36e5;
+    const m = Math.floor(diff / 6e4);   diff -= m * 6e4;
+    $('d').textContent = d; $('dl').textContent = d === 1 ? 'day' : 'days';
+    $('h').textContent = pad(hh); $('m').textContent = pad(m); $('s').textContent = pad(Math.floor(diff / 1e3));
+
+    // the climb starts October 1 of the season
+    const start = new Date(t.getMonth() === 0 ? t.getFullYear() - 1 : t.getFullYear(), 9, 1);
+    const p = Math.min(1, Math.max(0, (now - start) / (t - start)));
+    placeHiker(p);
+    $('pct').innerHTML = '<strong>' + Math.round(p * 100) + '%</strong> to ' + h.name;
+  }
+
+  select(current);
+  setInterval(tick, 1000);
+
+  // Snowfall with on/off toggle
+  const btn = $('snowbtn'), cv = root.querySelector('canvas.snow'), ctx = cv.getContext && cv.getContext('2d');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let on = !reduce, W = 0, H = 0, flakes = [], raf = null;
+  function size(){
+    const r = root.getBoundingClientRect(), dpr = Math.min(window.devicePixelRatio || 1, 2);
+    W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr,0,0,dpr,0,0);
+    flakes = Array.from({length: Math.round(W / 9)}, () => ({ x: Math.random()*W, y: Math.random()*H,
+      r: Math.random()*1.7 + .6, v: Math.random()*.5 + .25, dr: Math.random()*.6 - .3, o: Math.random()*.5 + .35 }));
+  }
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    for (const f of flakes){
+      f.y += f.v; f.x += f.dr;
+      if (f.y > H){ f.y = -4; f.x = Math.random()*W; }
+      if (f.x > W) f.x = 0; if (f.x < 0) f.x = W;
+      ctx.globalAlpha = f.o; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(f.x, f.y, f.r, 0, Math.PI*2); ctx.fill();
+    }
+    raf = requestAnimationFrame(draw);
+  }
+  function setSnow(v){
+    on = v; btn.setAttribute('aria-pressed', v);
+    if (!ctx) return;
+    if (v && !raf) draw();
+    if (!v){ cancelAnimationFrame(raf); raf = null; ctx.clearRect(0,0,W,H); }
+  }
+  btn.addEventListener('click', () => setSnow(!on));
+  if (ctx){ new ResizeObserver(size).observe(root); size(); }
+  setSnow(on);
+})();
+</script>
+</body>
+</html>
